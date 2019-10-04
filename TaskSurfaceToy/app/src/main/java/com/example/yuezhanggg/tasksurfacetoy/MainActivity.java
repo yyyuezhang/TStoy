@@ -4,9 +4,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,7 +12,6 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private ViewGroup mParent;
     private RecyclerView mParentRecyclerView;
     private View mDummyView;
 
@@ -26,7 +23,6 @@ public class MainActivity extends AppCompatActivity {
         data.add(new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5)));
         data.add(new ArrayList<>(Arrays.asList(6, 7, 8, 9, 10)));
 
-        mParent = findViewById(R.id.parent_view);
         mDummyView = findViewById(R.id.dummy_view);
 
         mParentRecyclerView = findViewById(R.id.parent_recycler_view);
