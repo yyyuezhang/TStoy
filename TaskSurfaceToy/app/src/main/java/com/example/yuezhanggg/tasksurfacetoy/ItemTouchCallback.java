@@ -1,11 +1,17 @@
 package com.example.yuezhanggg.tasksurfacetoy;
 
+import android.content.ClipData;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.helper.ItemTouchHelper;
+import android.util.Log;
+import android.view.DragEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
@@ -19,27 +25,34 @@ public class ItemTouchCallback extends ItemTouchHelper.SimpleCallback {
     private ItemAdapter mOtherItemAdapter;
     private ItemTouchHelper mOtherItemTouchHelper;
     private RecyclerView mOtherRecyclerView;
+    private ItemTouchCallback mOtherItemTouchCallback;
 
     private View mDummyView;
+    private View mParentView;
+    private int mStatusbarHeight;
+
+    private int mCurrentItemIndex = -1;
 
     public ItemTouchCallback(int dragDirs, int swipeDirs) {
         super(dragDirs, swipeDirs);
     }
 
     public void initialize(RecyclerView rv, ItemAdapter adapter, ItemTouchHelper itemTouchHelper,
-                           View dummyView) {
+                           View dummyView, View parentView) {
         mItemAdapter = adapter;
         mItemTouchHelper = itemTouchHelper;
         mRecyclerView = rv;
         mDummyView = dummyView;
+        mParentView = parentView;
     }
 
     public void initializeOther(ItemAdapter adapter, ItemTouchHelper itemTouchHelper,
-                                RecyclerView recyclerView) {
+                                RecyclerView recyclerView, ItemTouchCallback itemTouchCallback) {
         // Get the reference of components of the other child recyclerView.
         mOtherItemAdapter = adapter;
         mOtherItemTouchHelper = itemTouchHelper;
         mOtherRecyclerView = recyclerView;
+        mOtherItemTouchCallback = itemTouchCallback;
     }
 
     @Override
@@ -79,35 +92,124 @@ public class ItemTouchCallback extends ItemTouchHelper.SimpleCallback {
 
         mDummyView.setX(viewHolder.itemView.getX());
         mDummyView.setY(viewHolder.itemView.getY() + recyclerView.getTop());
-        // The thing I am trying to do here is that when you drag an item down to reach item.getY()
-        // > 1000, we then:
-        //       1. Stop the first ItemTouchHelper from handling this drag event by dispatching
-        //          a ACTION_CANCEL.
-        //       2. Let the second ItemTouchHelper start handling this drag event by dispatching
-        //          a ACTION_DOWN.
-        //       3. Call ItemTouchHelper.startDrag() of the second ItemTouchHelper to start
-        //          dragging.
-        if (mDummyView.getY() > 1000) {
-            long downTime = SystemClock.uptimeMillis();
-            long eventTime = SystemClock.uptimeMillis();
-            int action = MotionEvent.ACTION_CANCEL;
-            int x = 20;
-            int y = 20;
-            int metaState = 0;
-            MotionEvent e = MotionEvent.obtain(downTime, eventTime, action, x ,y, metaState);
-            mRecyclerView.dispatchTouchEvent(e);
-
-            View otherView = mOtherRecyclerView.findViewHolderForAdapterPosition(0).itemView;
-            int action2 = MotionEvent.ACTION_DOWN;
-            MotionEvent e2 = MotionEvent.obtain(downTime, eventTime, action2, otherView.getX(), otherView.getY() + mOtherRecyclerView.getTop(), metaState);
-            mOtherRecyclerView.dispatchTouchEvent(e2);
-
-            mOtherItemTouchHelper.startDrag(mOtherRecyclerView.findViewHolderForAdapterPosition(0));
-        }
     }
 
     private void updateDummyView(View itemView){
         String text = ((TextView) itemView.findViewById(R.id.text)).getText().toString();
         ((TextView) mDummyView).setText(text);
+    }
+
+
+    public void handleDragEvent(DragEvent event) {
+        float x = event.getX();
+        float y = event.getY();
+        Rect parentRect = new Rect();
+        mParentView.getGlobalVisibleRect(parentRect);
+
+        if (event.getAction() == DragEvent.ACTION_DRAG_STARTED) {
+            if (y < mRecyclerView.getTop() || y > mRecyclerView.getBottom() ||
+                    x < mRecyclerView.getLeft() || x > mRecyclerView.getRight()) return;
+            for (int i = 0; i < mRecyclerView.getAdapter().getItemCount(); i++) {
+                RecyclerView.ViewHolder viewHolder = mRecyclerView.findViewHolderForAdapterPosition(i);
+                if (viewHolder == null) continue;
+                View child = viewHolder.itemView;
+
+                Rect rect = new Rect();
+                child.getGlobalVisibleRect(rect);
+                rect.offset(0, -parentRect.top);
+                if (isOverlap(rect.centerX(), rect.centerY(), x, y,
+                        rect.width()/2)) {
+                    mCurrentItemIndex = i;
+                    View currentItemView = viewHolder.itemView;
+                    currentItemView.setVisibility(View.GONE);
+                    startDraggingDummyView();
+
+                }
+            }
+
+        } else if (event.getAction() == DragEvent.ACTION_DRAG_ENDED) {
+            if (mCurrentItemIndex == -1) return;
+
+            mRecyclerView.findViewHolderForAdapterPosition(mCurrentItemIndex).itemView.setVisibility(View.VISIBLE);
+            mCurrentItemIndex = -1;
+
+        } else if (event.getAction() == DragEvent.ACTION_DRAG_LOCATION) {
+            if (isOnBorder(y) && mCurrentItemIndex != -1) {
+                for (int i = 0; i < mOtherRecyclerView.getAdapter().getItemCount(); i++) {
+                    RecyclerView.ViewHolder viewHolder = mOtherRecyclerView.findViewHolderForAdapterPosition(i);
+                    if (viewHolder == null) continue;
+                    View child = viewHolder.itemView;
+                    Rect rect = new Rect();
+                    child.getGlobalVisibleRect(rect);
+                    rect.offset(0, -parentRect.top);
+                    if (isOverlap(rect.centerX(), rect.centerY(), x, y,
+                            rect.width()/2)) {
+                        final int otherIndex = i;
+
+                        Integer data = mItemAdapter.onItemRemoved(mCurrentItemIndex);
+                        mOtherItemAdapter.onItemAdded(data, otherIndex);
+
+                        mOtherItemTouchCallback.setCurrentItem(i);
+                        mOtherRecyclerView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                RecyclerView.ViewHolder otherViewHolder = mOtherRecyclerView.findViewHolderForAdapterPosition(otherIndex);
+                                if (otherViewHolder == null) {
+                                    if (mOtherRecyclerView.getLayoutManager() instanceof GridLayoutManager) return;
+//                                    LinearLayoutManager manager = (LinearLayoutManager) mOtherRecyclerView.getLayoutManager();
+//                                    manager.scrollToPosition(otherIndex);
+                                    mOtherRecyclerView.smoothScrollToPosition(otherIndex);
+                                    return;
+                                }
+                                mOtherRecyclerView.findViewHolderForAdapterPosition(otherIndex).itemView.setVisibility(View.GONE);
+                            }
+                        });
+                        mCurrentItemIndex = -1;
+                        return;
+                    }
+                }
+
+            }
+
+            if (y < mRecyclerView.getTop() || y > mRecyclerView.getBottom() ||
+                    x < mRecyclerView.getLeft() || x > mRecyclerView.getRight()) return;
+            if (mCurrentItemIndex == -1 || mRecyclerView.isAnimating()) return;
+
+            for (int i = 0; i < mRecyclerView.getAdapter().getItemCount(); i++) {
+                RecyclerView.ViewHolder toViewHolder = mRecyclerView.findViewHolderForAdapterPosition(i);
+                RecyclerView.ViewHolder fromViewHolder = mRecyclerView.findViewHolderForAdapterPosition(mCurrentItemIndex);
+                if (toViewHolder == null || fromViewHolder == null || i == mCurrentItemIndex) continue;
+                View child = toViewHolder.itemView;
+                Rect rect = new Rect();
+                child.getGlobalVisibleRect(rect);
+                rect.offset(0, -parentRect.top);
+                if (isOverlap(rect.centerX(), rect.centerY(), x, y,
+                        rect.width()/2)) {
+                    onMove(mRecyclerView, fromViewHolder, toViewHolder);
+                    mCurrentItemIndex = i;
+                    return;
+                }
+            }
+        }
+    }
+
+    private static boolean isOverlap(
+            float left1, float top1, float left2, float top2, float threshold) {
+        return Math.abs(left1 - left2) < threshold && Math.abs(top1 - top2) < threshold;
+    }
+
+    private void startDraggingDummyView() {
+        ClipData data = ClipData.newPlainText("", "");
+        View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(
+                mDummyView);
+        mParentView.startDrag(data, shadowBuilder, shadowBuilder, 0);
+    }
+
+    private boolean isOnBorder(float y) {
+        return mRecyclerView.getTop() - y > 100 || y - mRecyclerView.getBottom() > 100;
+    }
+
+    public void setCurrentItem(int currentItemIndex) {
+        mCurrentItemIndex = currentItemIndex;
     }
 }
