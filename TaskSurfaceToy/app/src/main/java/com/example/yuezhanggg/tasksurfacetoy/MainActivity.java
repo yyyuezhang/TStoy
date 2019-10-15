@@ -1,13 +1,10 @@
 package com.example.yuezhanggg.tasksurfacetoy;
 
-import android.content.ClipData;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.DragEvent;
-import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
@@ -29,18 +26,20 @@ public class MainActivity extends AppCompatActivity {
 
         final View parentView = findViewById(R.id.parent_view);
         mDummyView = findViewById(R.id.dummy_view);
-
         mParentRecyclerView = findViewById(R.id.parent_recycler_view);
         mParentRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         final RecyclerViewAdapter adapter = new RecyclerViewAdapter(data, mDummyView, parentView);
         mParentRecyclerView.setAdapter(adapter);
 
-
         parentView.setOnDragListener(new View.OnDragListener() {
             @Override
             public boolean onDrag(View v, DragEvent event) {
+                // Dispatch the touch event to all the child callbacks. If one callback handles the
+                // the drag event, stop dispatching it to other callbacks.
                 for (ItemTouchCallback callback : adapter.getCallbacks()) {
-                    callback.handleDragEvent(event);
+                    if (callback.handleDragEvent(event)) {
+                        break;
+                    }
                 }
                 return true;
             }
@@ -60,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
                         child1.mItemTouchHelper, (RecyclerView) child1.itemView, child1.mItemTouchCallback);
             }
         });
+        // Dummy Item to create the drag shadow.
         mDummyView.setVisibility(View.INVISIBLE);
     }
 }

@@ -34,17 +34,7 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         TextView textView = viewHolder.itemView.findViewById(R.id.text);
         textView.setText(String.valueOf(mData.get(i)));
 
-//        viewHolder.itemView.setOnTouchListener(new View.OnTouchListener() {
-//            @Override
-//            public boolean onTouch(View v, MotionEvent event) {
-//                ClipData data = ClipData.newPlainText("", "");
-//                View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(
-//                        mDummyView);
-//                mParentView.startDrag(data, shadowBuilder, mDummyView, 0);
-//                return false;
-//            }
-//        });
-
+        // Every single item should handover the touch event to global onDragListener to handle.
         viewHolder.itemView.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {

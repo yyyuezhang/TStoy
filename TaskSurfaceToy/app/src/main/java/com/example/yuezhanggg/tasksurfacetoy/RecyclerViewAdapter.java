@@ -1,12 +1,10 @@
 package com.example.yuezhanggg.tasksurfacetoy;
 
-import android.media.browse.MediaBrowser;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.helper.ItemTouchHelper;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,8 +49,8 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerViewAdapte
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(callback);
         callback.initialize(rv, itemAdapter, itemTouchHelper, mDummyView, mParentView);
         mCallbacks.add(callback);
+        // Don't attach the ItemTouchHelper to the recyclerVIew.
 //        itemTouchHelper.attachToRecyclerView(rv);
-
         viewHolder.setItemAdapter(itemAdapter);
         viewHolder.setItemTouchHelper(itemTouchHelper);
         viewHolder.setItemTouchCallback(callback);
